@@ -3,7 +3,7 @@
 Run YOLOv5 segmentation inference on images, videos, directories, streams, etc.
 
 Usage - sources:
-    $ python segment/predict.py --weights yolov5s-seg.pt --source 0                               # webcam
+    $ python segment/predictpl.py --weights yolov5s-seg.pt --source 0                               # webcam
                                                                   img.jpg                         # image
                                                                   vid.mp4                         # video
                                                                   screen                          # screenshot
