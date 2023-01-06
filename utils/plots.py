@@ -18,6 +18,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sn
 import torch
+import serial , time
 from PIL import Image, ImageDraw, ImageFont
 
 from utils import TryExcept, threaded
@@ -144,6 +145,14 @@ class Annotator:
         yl = int(centerpl.y)
         cv2.putText(self.im,"%s,%s"%(xl,yl),(xl+10,yl+10),0,0.8,color,thickness = 1,lineType = cv2.LINE_AA)
         cv2.circle(self.im, (xl, yl), 2, color, -1)
+        return xl,yl
+        # arduino = serial.Serial(port='COM5', baudrate=2000000, timeout=10)
+        # # arduino.write("LED13-ON".encode())
+        # arduino.write(("%s %s"%(xl,yl)).encode())
+        # time.sleep(.1)
+        # arduino.close()
+        # image size = 640*480
+        # print(self.im.shape)
 
     # Write guildline in object detection
     def writeGuildline(self, box, color=(128, 128, 128), txt_color=(255, 255, 255)):
