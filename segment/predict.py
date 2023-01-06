@@ -8,8 +8,6 @@ Usage - sources:
                                                                   vid.mp4                         # video
                                                                   screen                          # screenshot
                                                                   path/                           # directory
-                                                                  list.txt                        # list of images
-                                                                  list.streams                    # list of streams
                                                                   'path/*.jpg'                    # glob
                                                                   'https://youtu.be/Zgi9g1ksQHc'  # YouTube
                                                                   'rtsp://example.com/media.mp4'  # RTSP, RTMP, HTTP stream
@@ -33,7 +31,11 @@ import os
 import platform
 import sys
 from pathlib import Path
-
+import sys
+import numpy
+numpy.set_printoptions(threshold=sys.maxsize)
+import time,serial
+ser = serial.Serial("COM3", 2000000, timeout=2)
 import torch
 
 FILE = Path(__file__).resolve()
@@ -46,9 +48,9 @@ from models.common import DetectMultiBackend
 from utils.dataloaders import IMG_FORMATS, VID_FORMATS, LoadImages, LoadScreenshots, LoadStreams
 from utils.general import (LOGGER, Profile, check_file, check_img_size, check_imshow, check_requirements, colorstr, cv2,
                            increment_path, non_max_suppression, print_args, scale_boxes, scale_segments,
-                           strip_optimizer)
+                           strip_optimizer, xyxy2xywh)
 from utils.plots import Annotator, colors, save_one_box
-from utils.segment.general import masks2segments, process_mask, process_mask_native
+from utils.segment.general import masks2segments, process_mask
 from utils.torch_utils import select_device, smart_inference_mode
 
 
@@ -87,7 +89,7 @@ def run(
     save_img = not nosave and not source.endswith('.txt')  # save inference images
     is_file = Path(source).suffix[1:] in (IMG_FORMATS + VID_FORMATS)
     is_url = source.lower().startswith(('rtsp://', 'rtmp://', 'http://', 'https://'))
-    webcam = source.isnumeric() or source.endswith('.streams') or (is_url and not is_file)
+    webcam = source.isnumeric() or source.endswith('.txt') or (is_url and not is_file)
     screenshot = source.lower().startswith('screen')
     if is_url and is_file:
         source = check_file(source)  # download
@@ -153,19 +155,13 @@ def run(
             imc = im0.copy() if save_crop else im0  # for save_crop
             annotator = Annotator(im0, line_width=line_thickness, example=str(names))
             if len(det):
-                if retina_masks:
-                    # scale bbox first the crop masks
-                    det[:, :4] = scale_boxes(im.shape[2:], det[:, :4], im0.shape).round()  # rescale boxes to im0 size
-                    masks = process_mask_native(proto[i], det[:, 6:], det[:, :4], im0.shape[:2])  # HWC
-                else:
-                    masks = process_mask(proto[i], det[:, 6:], det[:, :4], im.shape[2:], upsample=True)  # HWC
-                    det[:, :4] = scale_boxes(im.shape[2:], det[:, :4], im0.shape).round()  # rescale boxes to im0 size
+                masks = process_mask(proto[i], det[:, 6:], det[:, :4], im.shape[2:], upsample=True)  # HWC
+                det[:, :4] = scale_boxes(im.shape[2:], det[:, :4], im0.shape).round()  # rescale boxes to im0 size
 
                 # Segments
                 if save_txt:
-                    segments = [
-                        scale_segments(im0.shape if retina_masks else im.shape[2:], x, im0.shape, normalize=True)
-                        for x in reversed(masks2segments(masks))]
+                    segments = reversed(masks2segments(masks))
+                    segments = [scale_segments(im.shape[2:], x, im0.shape, normalize=True) for x in segments]
 
                 # Print results
                 for c in det[:, 5].unique():
@@ -173,27 +169,47 @@ def run(
                     s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "  # add to string
 
                 # Mask plotting
-                annotator.masks(
-                    masks,
-                    colors=[colors(x, True) for x in det[:, 5]],
-                    im_gpu=torch.as_tensor(im0, dtype=torch.float16).to(device).permute(2, 0, 1).flip(0).contiguous() /
-                    255 if retina_masks else im[i])
+                annotator.masks(masks,
+                                colors=[colors(x, True) for x in det[:, 5]],
+                                im_gpu=None if retina_masks else im[i])
+                
+                
+                # print(len(masks[0][0]))
+                # print(masks[0][0])
+                
 
                 # Write results
                 for j, (*xyxy, conf, cls) in enumerate(reversed(det[:, :6])):
                     if save_txt:  # Write to file
-                        seg = segments[j].reshape(-1)  # (n,2) to (n*2)
-                        line = (cls, *seg, conf) if save_conf else (cls, *seg)  # label format
+                        segj = segments[j].reshape(-1)  # (n,2) to (n*2)
+                        line = (cls, *segj, conf) if save_conf else (cls, *segj)  # label format
+                        # print(segments[j])
                         with open(f'{txt_path}.txt', 'a') as f:
                             f.write(('%g ' * len(line)).rstrip() % line + '\n')
-
                     if save_img or save_crop or view_img:  # Add bbox to image
                         c = int(cls)  # integer class
+                        segments = reversed(masks2segments(masks))
+                        segments = [scale_segments(im.shape[2:], x, im0.shape, normalize=False) for x in segments]
                         label = None if hide_labels else (names[c] if hide_conf else f'{names[c]} {conf:.2f}')
-                        annotator.box_label(xyxy, label, color=colors(c, True))
+                        annotator.box_label(xyxy,segments[j], label, color=colors(c, True))
                         # annotator.draw.polygon(segments[j], outline=colors(c, True), width=3)
+                        # Write center point in image
+                        annotator.centerpointbbox(xyxy, color=colors(c, True))
+                        xcen,ycen = annotator.find_centerpolygon(segments[j], color=colors(c, True))
+                        # print(xcen,ycen)
+                        ser.write(("%s %s"%(xcen,ycen)).encode())
+                        # time.sleep(0.1)
+                        # print(ser)
+                        # annotator.writeGuildline(xyxy, color=colors(c, True))
+                        annotator.plotxy1(xyxy, color=colors(c, True))
                     if save_crop:
                         save_one_box(xyxy, imc, file=save_dir / 'crops' / names[c] / f'{p.stem}.jpg', BGR=True)
+            # FPS calculation
+            if 1 / dt[1].dt > 30:
+                fps = 30
+            else:
+                fps = 1 / dt[1].dt
+            annotator.fpsshow(fps = fps)
 
             # Stream results
             im0 = annotator.result()
@@ -236,7 +252,7 @@ def run(
         LOGGER.info(f"Results saved to {colorstr('bold', save_dir)}{s}")
     if update:
         strip_optimizer(weights[0])  # update model (to fix SourceChangeWarning)
-
+    
 
 def parse_opt():
     parser = argparse.ArgumentParser()
