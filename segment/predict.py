@@ -35,7 +35,7 @@ import sys
 import numpy
 numpy.set_printoptions(threshold=sys.maxsize)
 import time,serial
-ser = serial.Serial("COM3", 2000000, timeout=2)
+ser = serial.Serial("COM4", 2000000, timeout=2)
 import torch
 
 FILE = Path(__file__).resolve()
@@ -201,7 +201,7 @@ def run(
                         # time.sleep(0.1)
                         # print(ser)
                         # annotator.writeGuildline(xyxy, color=colors(c, True))
-                        annotator.plotxy1(xyxy, color=colors(c, True))
+                        # annotator.plotxy1(xyxy, color=colors(c, True))
                     if save_crop:
                         save_one_box(xyxy, imc, file=save_dir / 'crops' / names[c] / f'{p.stem}.jpg', BGR=True)
             # FPS calculation
@@ -252,7 +252,6 @@ def run(
         LOGGER.info(f"Results saved to {colorstr('bold', save_dir)}{s}")
     if update:
         strip_optimizer(weights[0])  # update model (to fix SourceChangeWarning)
-    
 
 def parse_opt():
     parser = argparse.ArgumentParser()
