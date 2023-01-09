@@ -35,7 +35,7 @@ import sys
 import numpy
 numpy.set_printoptions(threshold=sys.maxsize)
 import time,serial
-ser = serial.Serial("COM4", 2000000, timeout=2)
+# ser = serial.Serial("COM4", 2000000, timeout=2)
 import torch
 
 FILE = Path(__file__).resolve()
@@ -196,10 +196,8 @@ def run(
                         # Write center point in image
                         annotator.centerpointbbox(xyxy, color=colors(c, True))
                         xcen,ycen = annotator.find_centerpolygon(segments[j], color=colors(c, True))
-                        # print(xcen,ycen)
-                        ser.write(("%s %s"%(xcen,ycen)).encode())
-                        # time.sleep(0.1)
-                        # print(ser)
+                        # image size = 640*480
+                        # ser.write(("%s %s"%(xcen,ycen)).encode())
                         # annotator.writeGuildline(xyxy, color=colors(c, True))
                         # annotator.plotxy1(xyxy, color=colors(c, True))
                     if save_crop:
